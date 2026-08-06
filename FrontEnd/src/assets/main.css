@@ -1,0 +1,31 @@
+body {
+  background-color: #f5f6fa;
+}
+
+.card-product {
+  transition: transform 0.2s, box-shadow 0.2s;
+  border: 1px solid #eee;
+}
+
+.card-product:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.card-product img {
+  height: 180px;
+  object-fit: contain;
+  background: #fff;
+  padding: 10px;
+}
+
+.price-text {
+  color: #d70018;
+  font-weight: 700;
+}
+
+.badge-status-pending { background-color: #ffc107; }
+.badge-status-confirmed { background-color: #0d6efd; }
+.badge-status-shipping { background-color: #6f42c1; }
+.badge-status-completed { background-color: #198754; }
+.badge-status-cancelled { background-color: #dc3545; }
