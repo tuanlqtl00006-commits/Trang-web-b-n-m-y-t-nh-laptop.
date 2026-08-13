@@ -1,0 +1,23 @@
+# --- Backend (Maven/Java) ---
+ComputerStore_Full/Backend/target/
+ComputerStore_Full/Backend/uploads/*
+!ComputerStore_Full/Backend/uploads/.gitkeep
+
+# --- Frontend (Vue/Vite) ---
+ComputerStore_Full/FrontEnd/node_modules/
+ComputerStore_Full/FrontEnd/dist/
+
+# --- Wildcard fallbacks ---
+**/node_modules/
+**/target/
+**/dist/
+
+# --- IDE ---
+.idea/
+.vscode/
+*.iml
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
