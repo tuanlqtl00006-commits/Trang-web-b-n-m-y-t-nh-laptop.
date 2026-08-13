@@ -8,6 +8,9 @@ import com.example.computerstore.repository.BrandRepository;
 import com.example.computerstore.repository.CpuRepository;
 import com.example.computerstore.repository.RamRepository;
 import com.example.computerstore.util.ValidationUtil;
+import com.example.computerstore.model.ProductAuditLog;
+import com.example.computerstore.repository.ProductAuditLogRepository;
+import com.example.computerstore.security.CurrentUser;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
@@ -20,17 +23,20 @@ public class ProductService {
     private final BrandRepository brandRepository;
     private final CpuRepository cpuRepository;
     private final RamRepository ramRepository;
+    private final ProductAuditLogRepository auditLogRepository;
 
     public ProductService(ProductRepository repository,
                          CategoryRepository categoryRepository,
                          BrandRepository brandRepository,
                          CpuRepository cpuRepository,
-                         RamRepository ramRepository) {
+                         RamRepository ramRepository,
+                         ProductAuditLogRepository auditLogRepository) {
         this.repository = repository;
         this.categoryRepository = categoryRepository;
         this.brandRepository = brandRepository;
         this.cpuRepository = cpuRepository;
         this.ramRepository = ramRepository;
+        this.auditLogRepository = auditLogRepository;
     }
 
     public List<ProductDTO> getAll() {
@@ -93,17 +99,19 @@ public class ProductService {
     }
 
     public ProductDTO update(Long id, ProductDTO dto) {
+        // Fallback or full update delegating to split methods
+        updateInfo(id, dto);
+        return updateSensitive(id, dto);
+    }
+
+    public ProductDTO updateInfo(Long id, ProductDTO dto) {
         Optional<Product> existing = repository.findById(id);
         if (existing.isPresent()) {
             ValidationUtil.requireNotBlank(dto.getName(), "tên sản phẩm");
-            ValidationUtil.requireValidPrice(dto.getPrice());
-            ValidationUtil.requireValidStock(dto.getStock());
             ValidationUtil.requireValidOs(dto.getOs());
 
             Product product = existing.get();
             product.setName(dto.getName());
-            product.setPrice(dto.getPrice());
-            product.setStock(dto.getStock());
             product.setImage(dto.getImage());
             product.setDescription(dto.getDescription());
             product.setStatus(dto.getStatus());
@@ -112,16 +120,58 @@ public class ProductService {
             product.setScreen(dto.getScreen());
             product.setOs(dto.getOs());
 
-            if (dto.getCategoryId() != null) {
+            Product updatedProduct = repository.save(product);
+            return convertToDTO(updatedProduct);
+        }
+        return null;
+    }
+
+    public ProductDTO updateSensitive(Long id, ProductDTO dto) {
+        Optional<Product> existing = repository.findById(id);
+        if (existing.isPresent()) {
+            ValidationUtil.requireValidPrice(dto.getPrice());
+            ValidationUtil.requireValidStock(dto.getStock());
+
+            Product product = existing.get();
+            Long userId = CurrentUser.get().getId();
+
+            // Track Price
+            if (dto.getPrice() != null && !dto.getPrice().equals(product.getPrice())) {
+                logAudit(id, userId, "price", String.valueOf(product.getPrice()), String.valueOf(dto.getPrice()));
+                product.setPrice(dto.getPrice());
+            }
+
+            // Track Stock
+            if (dto.getStock() != null && !dto.getStock().equals(product.getStock())) {
+                logAudit(id, userId, "stock", String.valueOf(product.getStock()), String.valueOf(dto.getStock()));
+                product.setStock(dto.getStock());
+            }
+
+            // Track Category
+            Long oldCatId = product.getCategory() != null ? product.getCategory().getId() : null;
+            if (dto.getCategoryId() != null && !dto.getCategoryId().equals(oldCatId)) {
+                logAudit(id, userId, "categoryId", String.valueOf(oldCatId), String.valueOf(dto.getCategoryId()));
                 product.setCategory(categoryRepository.findById(dto.getCategoryId()).orElse(null));
             }
-            if (dto.getBrandId() != null) {
+
+            // Track Brand
+            Long oldBrandId = product.getBrand() != null ? product.getBrand().getId() : null;
+            if (dto.getBrandId() != null && !dto.getBrandId().equals(oldBrandId)) {
+                logAudit(id, userId, "brandId", String.valueOf(oldBrandId), String.valueOf(dto.getBrandId()));
                 product.setBrand(brandRepository.findById(dto.getBrandId()).orElse(null));
             }
-            if (dto.getCpuId() != null) {
+
+            // Track Cpu
+            Long oldCpuId = product.getCpu() != null ? product.getCpu().getId() : null;
+            if (dto.getCpuId() != null && !dto.getCpuId().equals(oldCpuId)) {
+                logAudit(id, userId, "cpuId", String.valueOf(oldCpuId), String.valueOf(dto.getCpuId()));
                 product.setCpu(cpuRepository.findById(dto.getCpuId()).orElse(null));
             }
-            if (dto.getRamId() != null) {
+
+            // Track Ram
+            Long oldRamId = product.getRam() != null ? product.getRam().getId() : null;
+            if (dto.getRamId() != null && !dto.getRamId().equals(oldRamId)) {
+                logAudit(id, userId, "ramId", String.valueOf(oldRamId), String.valueOf(dto.getRamId()));
                 product.setRam(ramRepository.findById(dto.getRamId()).orElse(null));
             }
 
@@ -129,6 +179,18 @@ public class ProductService {
             return convertToDTO(updatedProduct);
         }
         return null;
+    }
+
+    private void logAudit(Long productId, Long userId, String fieldName, String oldValue, String newValue) {
+        ProductAuditLog audit = new ProductAuditLog(
+            productId,
+            userId,
+            fieldName,
+            oldValue,
+            newValue,
+            java.time.LocalDateTime.now()
+        );
+        auditLogRepository.save(audit);
     }
 
     /** Soft delete: hides the product from customers but keeps history (orders, stats) intact. */

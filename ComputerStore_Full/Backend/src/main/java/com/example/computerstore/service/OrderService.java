@@ -68,12 +68,6 @@ public class OrderService {
             o.setPhone(order.getPhone());
             o.setAddress(order.getAddress());
             o.setPaymentMethod(order.getPaymentMethod());
-            o.setSubtotal(order.getSubtotal());
-            o.setVat(order.getVat());
-            o.setTotal(order.getTotal());
-            o.setStatus(order.getStatus());
-            o.setOrderDate(order.getOrderDate());
-            o.setCancellationReason(order.getCancellationReason());
             return repository.save(o);
         }
         return null;

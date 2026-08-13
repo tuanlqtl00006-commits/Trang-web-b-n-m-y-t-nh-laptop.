@@ -16,19 +16,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * PHÂN QUYỀN THẬT SỰ Ở BACKEND.
- *
- * Trước đây file này có `.anyRequest().permitAll()` — nghĩa là MỌI API đều
- * mở công khai bất kể giao diện có ẩn nút hay chặn route thế nào. Một nhân
- * viên (hoặc bất kỳ ai, kể cả không đăng nhập) chỉ cần gọi thẳng API bằng
- * Postman/DevTools là thao tác được như admin: xóa sản phẩm, khóa/mở tài
- * khoản khách hàng, tạo/xóa nhân viên khác...
- *
- * Bây giờ mỗi nhóm endpoint được khai rõ ai được phép gọi. Vài trường hợp
- * cần logic tinh hơn (vd: khách tự sửa hồ sơ CHÍNH MÌNH) được xử lý thêm
- * trong controller bằng CurrentUser.requireSelfOrAdmin(...).
- */
+
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -46,10 +34,10 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authz -> authz
-                // Preflight CORS luôn phải cho qua, nếu không trình duyệt sẽ chặn hết.
+
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                // --- Công khai: đăng nhập/đăng ký, ảnh sản phẩm ---
+
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/uploads/**").permitAll()
 
@@ -74,8 +62,10 @@ public class SecurityConfig {
                 // XÓA catalog chỉ dành cho ADMIN — nhân viên không được phép xóa sản phẩm/danh mục/...
                 .requestMatchers(HttpMethod.POST, "/api/products/**", "/api/categories/**",
                         "/api/brands/**", "/api/cpus/**", "/api/rams/**").hasAnyRole("ADMIN", "STAFF")
+                .requestMatchers(HttpMethod.PUT, "/api/products/*/info").hasAnyRole("ADMIN", "STAFF")
+                .requestMatchers(HttpMethod.PUT, "/api/products/*/sensitive").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/products/**", "/api/categories/**",
-                        "/api/brands/**", "/api/cpus/**", "/api/rams/**").hasAnyRole("ADMIN", "STAFF")
+                        "/api/brands/**", "/api/cpus/**", "/api/rams/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/api/products/**", "/api/categories/**",
                         "/api/brands/**", "/api/cpus/**", "/api/rams/**").hasRole("ADMIN")
 

@@ -38,19 +38,34 @@ public class OrderItemService {
     }
 
     public OrderItem create(OrderItem item) {
+        if (item.getQuantity() == null || item.getQuantity() <= 0) {
+            throw new IllegalArgumentException("Số lượng sản phẩm phải lớn hơn 0");
+        }
+
         if (item.getOrder() != null && item.getOrder().getId() != null) {
             Order order = orderRepository.findById(item.getOrder().getId()).orElse(null);
             item.setOrder(order);
         }
         if (item.getProduct() != null && item.getProduct().getId() != null) {
             Product product = productRepository.findById(item.getProduct().getId()).orElse(null);
-            item.setProduct(product);
-            if (product != null) {
-                // Trừ kho khi tạo chi tiết đơn hàng
-                int newStock = product.getStock() - item.getQuantity();
-                product.setStock(Math.max(newStock, 0));
-                productRepository.save(product);
+            if (product == null) {
+                throw new IllegalArgumentException("Sản phẩm không tồn tại");
             }
+            item.setProduct(product);
+            // Luôn lấy giá từ product.getPrice() trong DB để gán vào item
+            item.setPrice(product.getPrice());
+
+            // Trước khi trừ kho, kiểm tra product.getStock() >= item.getQuantity()
+            int currentStock = product.getStock() != null ? product.getStock() : 0;
+            if (currentStock < item.getQuantity()) {
+                throw new IllegalArgumentException("Không đủ hàng trong kho");
+            }
+
+            // Trừ kho khi tạo chi tiết đơn hàng
+            product.setStock(currentStock - item.getQuantity());
+            productRepository.save(product);
+        } else {
+            throw new IllegalArgumentException("Sản phẩm không hợp lệ");
         }
         return repository.save(item);
     }

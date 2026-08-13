@@ -84,9 +84,18 @@ public class ProductController {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<ProductDTO> update(@PathVariable Long id, @RequestBody ProductDTO dto) {
-        ProductDTO updated = service.update(id, dto);
+    @PutMapping("/{id}/info")
+    public ResponseEntity<ProductDTO> updateInfo(@PathVariable Long id, @RequestBody ProductDTO dto) {
+        ProductDTO updated = service.updateInfo(id, dto);
+        if (updated != null) {
+            return ResponseEntity.ok(updated);
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    @PutMapping("/{id}/sensitive")
+    public ResponseEntity<ProductDTO> updateSensitive(@PathVariable Long id, @RequestBody ProductDTO dto) {
+        ProductDTO updated = service.updateSensitive(id, dto);
         if (updated != null) {
             return ResponseEntity.ok(updated);
         }
