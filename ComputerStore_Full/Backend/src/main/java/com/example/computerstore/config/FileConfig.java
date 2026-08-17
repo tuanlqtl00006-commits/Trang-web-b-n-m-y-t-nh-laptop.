@@ -10,10 +10,18 @@ public class FileConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        String absolutePath = UploadUtil.getUploadsAbsolutePath();
+        String uploadUri = UploadUtil.getUploadsDir().toURI().toString();
+        if (!uploadUri.endsWith("/")) {
+            uploadUri += "/";
+        }
+        String absolutePath = UploadUtil.getUploadsAbsolutePath().replace('\\', '/');
+        if (!absolutePath.endsWith("/")) {
+            absolutePath += "/";
+        }
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations(
-                        "file:" + absolutePath + "/",
+                        uploadUri,
+                        "file:" + absolutePath,
                         "file:uploads/",
                         "file:Backend/uploads/"
                 );
