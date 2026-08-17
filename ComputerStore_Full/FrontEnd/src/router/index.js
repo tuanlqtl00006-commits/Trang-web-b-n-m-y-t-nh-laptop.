@@ -19,6 +19,7 @@ import OrderSuccess from "../views/client/OrderSuccess.vue";
 import ClientOrders from "../views/client/ClientOrders.vue";
 import OrderDetail from "../views/client/OrderDetail.vue";
 import Profile from "../views/client/Profile.vue";
+import Wishlist from "../views/client/Wishlist.vue";
 
 // admin
 import AdminDashboard from "../views/admin/Dashboard.vue";
@@ -48,6 +49,7 @@ const routes = [
       { path: "product/:id", name: "ProductDetail", component: ProductDetail },
       { path: "category/:id", name: "ProductsByCategory", component: ProductsByCategory },
       { path: "cart", name: "Cart", component: Cart },
+      { path: "wishlist", name: "Wishlist", component: Wishlist },
       { path: "checkout", name: "Checkout", component: Checkout },
       { path: "order-success/:id", name: "OrderSuccess", component: OrderSuccess },
       { path: "orders", name: "ClientOrders", component: ClientOrders, meta: { requiresAuth: true } },
