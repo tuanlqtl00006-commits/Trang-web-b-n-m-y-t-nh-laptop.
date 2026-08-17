@@ -1,6 +1,13 @@
 <template>
   <div>
-    <h4 class="fw-bold mb-4">Quản lý đơn hàng</h4>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h4 class="fw-bold mb-0">
+        <i class="bi bi-eye-slash text-danger me-2"></i>Đơn hàng đã ẩn
+      </h4>
+      <router-link to="/admin/orders" class="btn btn-outline-dark btn-sm">
+        <i class="bi bi-arrow-left me-1"></i> Quay lại danh sách đơn hàng
+      </router-link>
+    </div>
 
     <!-- Thanh tìm kiếm + lọc trạng thái -->
     <div class="d-flex gap-2 mb-3 flex-wrap">
@@ -26,7 +33,7 @@
         <option value="CANCELLED">Đã hủy</option>
       </select>
       <span v-if="searchQuery || filterStatus" class="align-self-center text-muted small">
-        Tìm thấy {{ filteredOrders.length }} đơn
+        Tìm thấy {{ filteredOrders.length }} đơn đã ẩn
       </span>
     </div>
 
@@ -39,7 +46,7 @@
           <th>Tổng tiền</th>
           <th>Ngày đặt</th>
           <th>Trạng thái</th>
-          <th style="width: 280px">Xử lý</th>
+          <th style="width: 220px">Thao tác</th>
         </tr>
       </thead>
       <tbody>
@@ -54,49 +61,23 @@
           </td>
           <td>
             <div class="d-flex flex-wrap gap-1">
-              <button
-                v-if="o.status === 'PENDING'"
-                class="btn btn-sm btn-primary"
-                @click="setStatus(o, 'CONFIRMED')"
-              >
-                <i class="bi bi-check2"></i> Xác nhận
-              </button>
-              <button
-                v-if="o.status === 'CONFIRMED'"
-                class="btn btn-sm btn-primary"
-                @click="setStatus(o, 'SHIPPING')"
-              >
-                <i class="bi bi-truck"></i> Giao hàng
-              </button>
-              <button
-                v-if="o.status === 'PENDING' || o.status === 'CONFIRMED'"
-                class="btn btn-sm btn-outline-danger"
-                @click="cancelOrder(o)"
-              >
-                <i class="bi bi-x-circle"></i> Hủy
-              </button>
-              <span v-if="o.status === 'SHIPPING'" class="text-muted small align-self-center">
-                Đang chờ khách nhận hàng...
-              </span>
               <router-link :to="`/admin/orders/${o.id}`" class="btn btn-sm btn-outline-dark">
                 Chi tiết
               </router-link>
-              <!-- Chỉ admin mới được ẩn đơn hàng (không được xóa vĩnh viễn) -->
               <button
-                v-if="isAdmin"
-                class="btn btn-sm btn-outline-danger"
-                title="Ẩn đơn hàng (chỉ admin)"
-                @click="hideOrder(o)"
+                class="btn btn-sm btn-success"
+                title="Khôi phục đơn hàng về danh sách quản lý"
+                @click="restoreOrder(o)"
               >
-                <i class="bi bi-eye-slash"></i>
+                <i class="bi bi-arrow-counterclockwise me-1"></i>Khôi phục
               </button>
             </div>
           </td>
         </tr>
         <tr v-if="pagedOrders.length === 0">
           <td colspan="7" class="text-center text-muted py-4">
-            <span v-if="searchQuery || filterStatus">Không tìm thấy đơn hàng phù hợp.</span>
-            <span v-else>Không có đơn hàng nào.</span>
+            <span v-if="searchQuery || filterStatus">Không tìm thấy đơn hàng ẩn phù hợp.</span>
+            <span v-else>Không có đơn hàng nào bị ẩn.</span>
           </td>
         </tr>
       </tbody>
@@ -107,10 +88,9 @@
 </template>
 
 <script>
-import { getOrders, updateOrderStatus, hideOrder as apiHideOrder } from "@/api/order";
+import { getOrders, unhideOrder as apiUnhideOrder } from "@/api/order";
 import { toast } from "@/utils/toast";
 import AppPagination from "@/components/Pagination.vue";
-import { getUser } from "@/utils/session";
 
 const STATUS_LABELS = {
   PENDING: "Chờ xác nhận",
@@ -129,7 +109,7 @@ const STATUS_CLASSES = {
 };
 
 export default {
-  name: "AdminOrders",
+  name: "AdminHiddenOrders",
   components: { AppPagination },
   data() {
     return {
@@ -141,9 +121,6 @@ export default {
     };
   },
   computed: {
-    isAdmin() {
-      return (getUser()?.role || "").toLowerCase() === "admin";
-    },
     filteredOrders() {
       let result = this.orders;
       if (this.filterStatus) {
@@ -170,41 +147,21 @@ export default {
   },
   methods: {
     async loadOrders() {
-      const res = await getOrders();
-      this.orders = res.data.sort((a, b) => b.id - a.id);
-    },
-    async setStatus(order, newStatus) {
       try {
-        const res = await updateOrderStatus(order.id, newStatus);
-        order.status = res.data.status;
-        toast.success(
-          newStatus === "CONFIRMED"
-            ? "Đã xác nhận đơn hàng, chuyển sang trạng thái giao hàng khi sẵn sàng."
-            : "Đã chuyển đơn hàng sang trạng thái đang giao!"
-        );
+        const res = await getOrders({ showHidden: true });
+        this.orders = res.data.sort((a, b) => b.id - a.id);
       } catch (e) {
-        toast.error(e.response?.data?.message || "Cập nhật trạng thái thất bại!");
+        toast.error("Không thể tải danh sách đơn hàng đã ẩn!");
       }
     },
-    async cancelOrder(order) {
-      const reason = prompt("Nhập lý do hủy đơn hàng:", "Khách hàng yêu cầu hủy");
-      if (reason === null) return;
+    async restoreOrder(order) {
+      if (!confirm(`Khôi phục đơn hàng #${order.id} về danh sách quản lý?`)) return;
       try {
-        const res = await updateOrderStatus(order.id, "CANCELLED", reason);
-        order.status = res.data.status;
-        toast.success("Đã hủy đơn hàng!");
-      } catch (e) {
-        toast.error(e.response?.data?.message || "Không thể hủy đơn hàng!");
-      }
-    },
-    async hideOrder(order) {
-      if (!confirm(`Ẩn đơn hàng #${order.id} khỏi danh sách quản lý? Đơn hàng vẫn được lưu và có thể khôi phục trong mục 'Đơn hàng đã ẩn'.`)) return;
-      try {
-        await apiHideOrder(order.id);
+        await apiUnhideOrder(order.id);
         this.orders = this.orders.filter((o) => o.id !== order.id);
-        toast.success(`Đã ẩn đơn hàng #${order.id}!`);
+        toast.success(`Đã khôi phục đơn hàng #${order.id}!`);
       } catch (e) {
-        toast.error(e.response?.data?.message || "Không thể ẩn đơn hàng!");
+        toast.error(e.response?.data?.message || "Không thể khôi phục đơn hàng!");
       }
     },
     statusLabel(status) {

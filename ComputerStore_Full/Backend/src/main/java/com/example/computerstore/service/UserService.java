@@ -17,6 +17,30 @@ public class UserService {
         this.repository = repository;
     }
 
+    private UserDTO convertToDTO(User user) {
+        return new UserDTO(
+            user.getId(),
+            user.getFullname(),
+            user.getEmail(),
+            user.getPhone(),
+            null, // Không trả password ra DTO
+            user.getRole(),
+            user.getStatus()
+        );
+    }
+
+    private User convertToEntity(UserDTO dto) {
+        User user = new User();
+        user.setId(dto.getId());
+        user.setFullname(dto.getFullname());
+        user.setEmail(dto.getEmail());
+        user.setPhone(dto.getPhone());
+        user.setPassword(dto.getPassword());
+        user.setRole(dto.getRole());
+        user.setStatus(dto.getStatus());
+        return user;
+    }
+
     public List<UserDTO> getAll() {
         return repository.findAll().stream()
                 .map(this::convertToDTO)
@@ -30,8 +54,9 @@ public class UserService {
     }
 
     public UserDTO getById(Long id) {
-        Optional<User> user = repository.findById(id);
-        return user.map(this::convertToDTO).orElse(null);
+        return repository.findById(id)
+                .map(this::convertToDTO)
+                .orElse(null);
     }
 
     public UserDTO create(UserDTO dto) {
@@ -40,22 +65,21 @@ public class UserService {
         ValidationUtil.requireValidPhone(dto.getPhone());
         ValidationUtil.requireNotBlank(dto.getPassword(), "mật khẩu");
 
-        if (repository.findByEmail(dto.getEmail().trim()).isPresent()) {
+        Optional<User> existing = repository.findByEmail(dto.getEmail().trim());
+        if (existing.isPresent()) {
             throw new IllegalArgumentException("Email đã được sử dụng, vui lòng chọn email khác!");
         }
 
-        String role = dto.getRole() != null && !dto.getRole().trim().isEmpty()
-                ? dto.getRole().trim().toUpperCase()
-                : "USER";
-
-        User user = new User();
+        User user = convertToEntity(dto);
         user.setFullname(dto.getFullname().trim());
         user.setEmail(dto.getEmail().trim());
         user.setPhone(dto.getPhone().trim());
-        user.setPassword(dto.getPassword());
-        user.setRole(role);
-        user.setStatus("ACTIVE");
-
+        if (user.getStatus() == null || user.getStatus().trim().isEmpty()) {
+            user.setStatus("ACTIVE");
+        }
+        if (user.getRole() == null || user.getRole().trim().isEmpty()) {
+            user.setRole("USER");
+        }
         User savedUser = repository.save(user);
         return convertToDTO(savedUser);
     }
@@ -64,20 +88,25 @@ public class UserService {
         Optional<User> existing = repository.findById(id);
         if (existing.isPresent()) {
             User user = existing.get();
-
-            ValidationUtil.requireNotBlank(dto.getFullname(), "họ tên");
-            ValidationUtil.requireValidEmail(dto.getEmail());
-            ValidationUtil.requireValidPhone(dto.getPhone());
-
-            Optional<User> emailOwner = repository.findByEmail(dto.getEmail().trim());
-            if (emailOwner.isPresent() && !emailOwner.get().getId().equals(id)) {
-                throw new IllegalArgumentException("Email đã được sử dụng bởi tài khoản khác!");
+            if (dto.getFullname() != null && !dto.getFullname().trim().isEmpty()) {
+                user.setFullname(dto.getFullname().trim());
             }
-
-            user.setFullname(dto.getFullname().trim());
-            user.setEmail(dto.getEmail().trim());
-            user.setPhone(dto.getPhone().trim());
-            if (dto.getPassword() != null && !dto.getPassword().isEmpty()) {
+            if (dto.getEmail() != null && !dto.getEmail().trim().isEmpty()) {
+                String newEmail = dto.getEmail().trim();
+                ValidationUtil.requireValidEmail(newEmail);
+                if (!newEmail.equalsIgnoreCase(user.getEmail())) {
+                    Optional<User> duplicate = repository.findByEmail(newEmail);
+                    if (duplicate.isPresent()) {
+                        throw new IllegalArgumentException("Email đã được sử dụng bởi tài khoản khác!");
+                    }
+                    user.setEmail(newEmail);
+                }
+            }
+            if (dto.getPhone() != null && !dto.getPhone().trim().isEmpty()) {
+                ValidationUtil.requireValidPhone(dto.getPhone().trim());
+                user.setPhone(dto.getPhone().trim());
+            }
+            if (dto.getPassword() != null && !dto.getPassword().trim().isEmpty()) {
                 user.setPassword(dto.getPassword());
             }
             if (dto.getRole() != null && !dto.getRole().trim().isEmpty()) {
@@ -109,10 +138,5 @@ public class UserService {
             user.setStatus(status);
             repository.save(user);
         }
-    }
-
-    private UserDTO convertToDTO(User user) {
-        return new UserDTO(user.getId(), user.getFullname(), user.getEmail(),
-                           user.getPhone(), user.getPassword(), user.getRole(), user.getStatus());
     }
 }

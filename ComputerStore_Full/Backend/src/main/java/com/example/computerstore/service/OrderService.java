@@ -2,53 +2,77 @@ package com.example.computerstore.service;
 
 import com.example.computerstore.model.Order;
 import com.example.computerstore.repository.OrderRepository;
-import com.example.computerstore.repository.UserRepository;
 import org.springframework.stereotype.Service;
-
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 @Service
 public class OrderService {
     private final OrderRepository repository;
-    private final UserRepository userRepository;
 
-    // Allowed forward transitions for the order status workflow:
-    // PENDING (chờ admin/nhân viên xác nhận)
-    //   -> CONFIRMED (admin/nhân viên xác nhận đơn)
-    //   -> CANCELLED (khách hàng hủy khi chưa giao)
-    // CONFIRMED
-    //   -> SHIPPING (admin/nhân viên giao cho đơn vị vận chuyển)
-    //   -> CANCELLED
-    // SHIPPING
-    //   -> COMPLETED (khách hàng xác nhận đã nhận hàng & thanh toán)
-    // COMPLETED / CANCELLED: trạng thái cuối, không đổi được nữa.
-    private static final Map<String, Set<String>> ALLOWED_TRANSITIONS = Map.of(
-            "PENDING", Set.of("CONFIRMED", "CANCELLED"),
-            "CONFIRMED", Set.of("SHIPPING", "CANCELLED"),
-            "SHIPPING", Set.of("COMPLETED", "CANCELLED"),
-            "COMPLETED", Set.of(),
-            "CANCELLED", Set.of()
-    );
-
-    public OrderService(OrderRepository repository, UserRepository userRepository) {
+    public OrderService(OrderRepository repository) {
         this.repository = repository;
-        this.userRepository = userRepository;
     }
 
+    /**
+     * Thứ tự chuyển trạng thái chuẩn của đơn hàng.
+     * Khách hàng: PENDING -> CANCELLED (tự hủy khi chưa duyệt).
+     * Nhân viên/Admin: PENDING -> CONFIRMED -> SHIPPING -> COMPLETED, hoặc PENDING/CONFIRMED -> CANCELLED.
+     */
+    public static final List<String> STATUS_FLOW = List.of(
+            "PENDING",      // Chờ xác nhận
+            "CONFIRMED",    // Đã xác nhận (chuẩn bị giao)
+            "SHIPPING",     // Đang giao hàng
+            "COMPLETED"     // Đã giao thành công / hoàn tất
+    );
+
+    public static final String STATUS_CANCELLED = "CANCELLED";
+
     public List<Order> getAll() {
-        return repository.findAll();
+        return repository.findByIsHiddenFalseOrIsHiddenNull();
+    }
+
+    public List<Order> getAll(boolean showHidden) {
+        if (showHidden) {
+            return repository.findByIsHiddenTrue();
+        }
+        return repository.findByIsHiddenFalseOrIsHiddenNull();
+    }
+
+    public Order hide(Long id, Long hiddenBy) {
+        Optional<Order> existing = repository.findById(id);
+        if (existing.isPresent()) {
+            Order o = existing.get();
+            o.setIsHidden(true);
+            o.setHiddenAt(java.time.LocalDateTime.now());
+            o.setHiddenBy(hiddenBy);
+            return repository.save(o);
+        }
+        return null;
+    }
+
+    public Order unhide(Long id) {
+        Optional<Order> existing = repository.findById(id);
+        if (existing.isPresent()) {
+            Order o = existing.get();
+            o.setIsHidden(false);
+            o.setHiddenAt(null);
+            o.setHiddenBy(null);
+            return repository.save(o);
+        }
+        return null;
     }
 
     public List<Order> getActive() {
-        return repository.findByStatus("ACTIVE");
+        return repository.findAll();
     }
 
     public Order getById(Long id) {
-        Optional<Order> order = repository.findById(id);
-        return order.orElse(null);
+        return repository.findById(id).orElse(null);
+    }
+
+    public List<Order> getByStatus(String status) {
+        return repository.findByStatus(status);
     }
 
     public List<Order> getByUserId(Long userId) {
@@ -56,7 +80,12 @@ public class OrderService {
     }
 
     public Order create(Order order) {
-        order.setStatus("PENDING");
+        if (order.getStatus() == null || order.getStatus().trim().isEmpty()) {
+            order.setStatus("PENDING");
+        }
+        if (order.getOrderDate() == null) {
+            order.setOrderDate(java.time.LocalDateTime.now());
+        }
         return repository.save(order);
     }
 
@@ -64,50 +93,48 @@ public class OrderService {
         Optional<Order> existing = repository.findById(id);
         if (existing.isPresent()) {
             Order o = existing.get();
-            o.setCustomerName(order.getCustomerName());
-            o.setPhone(order.getPhone());
-            o.setAddress(order.getAddress());
-            o.setPaymentMethod(order.getPaymentMethod());
+            if (order.getCustomerName() != null) o.setCustomerName(order.getCustomerName());
+            if (order.getPhone() != null) o.setPhone(order.getPhone());
+            if (order.getAddress() != null) o.setAddress(order.getAddress());
+            if (order.getPaymentMethod() != null) o.setPaymentMethod(order.getPaymentMethod());
+            if (order.getSubtotal() != null) o.setSubtotal(order.getSubtotal());
+            if (order.getVat() != null) o.setVat(order.getVat());
+            if (order.getTotal() != null) o.setTotal(order.getTotal());
+            if (order.getStatus() != null) o.setStatus(order.getStatus());
+            if (order.getCancellationReason() != null) o.setCancellationReason(order.getCancellationReason());
             return repository.save(o);
         }
         return null;
     }
 
     /**
-     * Guided status transition used by both the admin/staff Orders screen and the
-     * customer order-detail screen. Enforces the workflow above instead of allowing
-     * an arbitrary jump to any status.
+     * Cập nhật trạng thái đơn hàng theo luồng nghiệp vụ.
      */
-    public Order updateStatus(Long id, String newStatus, String cancellationReason) {
-        Optional<Order> existing = repository.findById(id);
-        if (existing.isEmpty()) {
-            throw new IllegalArgumentException("Không tìm thấy đơn hàng!");
-        }
-        Order o = existing.get();
-        String current = o.getStatus() != null ? o.getStatus().toUpperCase() : "PENDING";
-        String target = newStatus != null ? newStatus.toUpperCase() : "";
+    public Order updateStatus(Long id, String nextStatus, String cancellationReason) {
+        Order order = repository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng #" + id));
 
-        Set<String> allowed = ALLOWED_TRANSITIONS.getOrDefault(current, Set.of());
-        if (!allowed.contains(target)) {
-            throw new IllegalArgumentException(
-                    "Không thể chuyển trạng thái đơn hàng từ " + current + " sang " + target + "!");
-        }
+        String currentStatus = order.getStatus();
 
-        o.setStatus(target);
-        if ("CANCELLED".equals(target)) {
-            o.setCancellationReason(cancellationReason != null && !cancellationReason.isBlank()
+        if (STATUS_CANCELLED.equalsIgnoreCase(nextStatus)) {
+            if ("COMPLETED".equalsIgnoreCase(currentStatus)) {
+                throw new IllegalStateException("Đơn hàng đã hoàn thành, không thể hủy!");
+            }
+            if (STATUS_CANCELLED.equalsIgnoreCase(currentStatus)) {
+                throw new IllegalStateException("Đơn hàng này đã bị hủy trước đó!");
+            }
+            order.setStatus(STATUS_CANCELLED);
+            order.setCancellationReason(cancellationReason != null && !cancellationReason.isBlank()
                     ? cancellationReason
-                    : "Không có lý do cụ thể");
+                    : "Hủy theo yêu cầu");
+            return repository.save(order);
         }
-        return repository.save(o);
+
+        order.setStatus(nextStatus);
+        return repository.save(order);
     }
 
     public void delete(Long id) {
-        Optional<Order> existing = repository.findById(id);
-        if (existing.isPresent()) {
-            Order o = existing.get();
-            o.setStatus("INACTIVE");
-            repository.save(o);
-        }
+        hide(id, null);
     }
 }

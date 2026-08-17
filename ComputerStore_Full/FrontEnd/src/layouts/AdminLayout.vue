@@ -97,6 +97,11 @@
               <i class="bi bi-person-badge me-2"></i>Tài khoản nhân viên
             </RouterLink>
           </li>
+          <li class="nav-item" v-if="isAdmin">
+            <RouterLink class="nav-link" to="/admin/hidden-orders">
+              <i class="bi bi-eye-slash me-2"></i>Đơn hàng đã ẩn
+            </RouterLink>
+          </li>
           <li class="nav-item mt-4">
             <button class="btn btn-danger w-100" @click="logout">
               <i class="bi bi-box-arrow-right me-1"></i>Đăng xuất

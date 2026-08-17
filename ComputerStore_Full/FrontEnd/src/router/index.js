@@ -32,6 +32,7 @@ import AdminOrderDetail from "../views/admin/OrderDetail.vue";
 import AdminCustomers from "../views/admin/Customers.vue";
 import AdminStaff from "../views/admin/Staff.vue";
 import AdminSales from "../views/admin/Sales.vue";
+import AdminHiddenOrders from "../views/admin/HiddenOrders.vue";
 
 // Roles allowed into the /admin area at all ("bán hàng"): admin + nhân viên (staff).
 // Some sub-routes are further restricted to admin only (see meta.adminOnly below) —
@@ -75,6 +76,7 @@ const routes = [
       // không bao gồm quản lý tài khoản).
       { path: "customers", name: "AdminCustomers", component: AdminCustomers, meta: { adminOnly: true } },
       { path: "staff", name: "AdminStaff", component: AdminStaff, meta: { adminOnly: true } },
+      { path: "hidden-orders", name: "AdminHiddenOrders", component: AdminHiddenOrders, meta: { adminOnly: true } },
     ],
   },
 ];

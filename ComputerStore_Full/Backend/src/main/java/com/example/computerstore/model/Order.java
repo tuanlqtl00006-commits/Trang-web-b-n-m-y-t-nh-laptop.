@@ -10,7 +10,7 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne
     @JoinColumn(name = "user_id")
     private User user;
 
@@ -28,18 +28,27 @@ public class Order {
 
     private Double total;
 
-    private String status;
+    private String status = "PENDING"; // PENDING, CONFIRMED, SHIPPING, COMPLETED, CANCELLED
 
     private LocalDateTime orderDate;
 
     private String cancellationReason;
 
+    @Column(name = "is_hidden")
+    private Boolean isHidden = false;
+
+    @Column(name = "hidden_at")
+    private LocalDateTime hiddenAt;
+
+    @Column(name = "hidden_by")
+    private Long hiddenBy;
+
     public Order() {
     }
 
-    public Order(Long id, User user, String customerName, String phone, String address,
-                 String paymentMethod, Double subtotal, Double vat, Double total,
-                 String status, LocalDateTime orderDate, String cancellationReason) {
+    public Order(Long id, User user, String customerName, String phone, String address, String paymentMethod,
+            Double subtotal, Double vat, Double total, String status, LocalDateTime orderDate,
+            String cancellationReason) {
         this.id = id;
         this.user = user;
         this.customerName = customerName;
@@ -148,5 +157,29 @@ public class Order {
 
     public void setCancellationReason(String cancellationReason) {
         this.cancellationReason = cancellationReason;
+    }
+
+    public Boolean getIsHidden() {
+        return isHidden;
+    }
+
+    public void setIsHidden(Boolean isHidden) {
+        this.isHidden = isHidden;
+    }
+
+    public LocalDateTime getHiddenAt() {
+        return hiddenAt;
+    }
+
+    public void setHiddenAt(LocalDateTime hiddenAt) {
+        this.hiddenAt = hiddenAt;
+    }
+
+    public Long getHiddenBy() {
+        return hiddenBy;
+    }
+
+    public void setHiddenBy(Long hiddenBy) {
+        this.hiddenBy = hiddenBy;
     }
 }

@@ -2,7 +2,7 @@
   <div>
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h4 class="fw-bold mb-0">Quản lý danh mục</h4>
-      <button class="btn btn-dark" @click="openCreate">
+      <button v-if="isAdmin" class="btn btn-dark" @click="openCreate">
         <i class="bi bi-plus-lg"></i> Thêm danh mục
       </button>
     </div>
@@ -40,7 +40,7 @@
             </span>
           </td>
           <td>
-            <button class="btn btn-sm btn-outline-primary me-1" @click="openEdit(c)">
+            <button v-if="isAdmin" class="btn btn-sm btn-outline-primary me-1" @click="openEdit(c)" title="Sửa danh mục">
               <i class="bi bi-pencil"></i>
             </button>
             <button v-if="isAdmin" class="btn btn-sm btn-outline-danger" @click="remove(c)" title="Xóa danh mục (chỉ admin)">

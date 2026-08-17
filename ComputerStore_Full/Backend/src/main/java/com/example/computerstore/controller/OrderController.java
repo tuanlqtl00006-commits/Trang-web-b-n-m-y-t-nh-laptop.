@@ -20,8 +20,8 @@ public class OrderController {
     }
 
     @GetMapping
-    public List<Order> getAll() {
-        return service.getAll();
+    public List<Order> getAll(@RequestParam(value = "showHidden", required = false, defaultValue = "false") boolean showHidden) {
+        return service.getAll(showHidden);
     }
 
     @GetMapping("/active")
@@ -85,9 +85,36 @@ public class OrderController {
         }
     }
 
+    @PatchMapping("/{id}/hide")
+    public ResponseEntity<Order> hide(@PathVariable Long id) {
+        if (!CurrentUser.get().isAdmin()) {
+            throw new org.springframework.security.access.AccessDeniedException("Chỉ ADMIN mới có quyền ẩn đơn hàng!");
+        }
+        Order hidden = service.hide(id, CurrentUser.get().getId());
+        if (hidden != null) {
+            return ResponseEntity.ok(hidden);
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    @PatchMapping("/{id}/unhide")
+    public ResponseEntity<Order> unhide(@PathVariable Long id) {
+        if (!CurrentUser.get().isAdmin()) {
+            throw new org.springframework.security.access.AccessDeniedException("Chỉ ADMIN mới có quyền khôi phục đơn hàng!");
+        }
+        Order unhidden = service.unhide(id);
+        if (unhidden != null) {
+            return ResponseEntity.ok(unhidden);
+        }
+        return ResponseEntity.notFound().build();
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
-        service.delete(id);
+        if (!CurrentUser.get().isAdmin()) {
+            throw new org.springframework.security.access.AccessDeniedException("Chỉ ADMIN mới có quyền thao tác trên đơn hàng!");
+        }
+        service.hide(id, CurrentUser.get().getId());
         return ResponseEntity.noContent().build();
     }
 }
